@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>露點溫度計算</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'industrial-black': '#1a1a1a', // 深金屬色
+                        'industrial-gray': '#2d2d2d',  // 中度灰色
+                        'industrial-accent': '#fb923c', // 亮橘色 (儀表感)
+                        'industrial-text': '#f8fafc',   // 極淺亮灰 (亮文字)
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                        sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap');
+        
+        body {
+            background-color: #121212;
+            background-image: radial-gradient(#262626 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .industrial-card {
+            background: #1e1e1e;
+            border: 2px solid #333;
+            box-shadow: 10px 10px 0px #000;
+            position: relative;
+        }
+
+        .industrial-card::before {
+            content: "";
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 5px;
+            background: #444;
+            box-shadow: 0 10px 0 #444, 0 20px 0 #444;
+        }
+
+        .input-gauge {
+            background: #000;
+            border: 1px solid #444;
+            color: #fb923c;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .lcd-display {
+            background: #0f172a;
+            border: 4px inset #334155;
+            text-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
+        }
+
+        .btn-press {
+            transition: all 0.1s;
+            box-shadow: 0 4px 0px #9a3412;
+        }
+
+        .btn-press:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0px #9a3412;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 font-sans text-industrial-text">
+
+    <div class="industrial-card w-full max-w-lg p-8 rounded-none">
+        <!-- 標題區 -->
+        <div class="border-l-8 border-industrial-accent pl-4 mb-8">
+            <h1 class="text-3xl font-black uppercase tracking-tighter text-industrial-accent">Dew Point Calculator</h1>
+            <p class="text-sm font-bold text-gray-400 mt-1 italic">露點溫度計算 V2.3</p>
+        </div>
+
+        <p class="text-sm text-gray-300 mb-8 leading-relaxed border-b border-gray-700 pb-4">
+            <span class="text-industrial-accent font-bold">SYSTEM STATUS:</span> 在給定壓力下，水蒸氣達到飽和並開始凝結的溫度。當物體表面低於此數值時將產生凝露。
+        </p>
+
+        <!-- 輸入區域 -->
+        <div class="space-y-6">
+            <!-- 溫度輸入 -->
+            <div class="relative">
+                <label for="temperature" class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Ambient Temp / 環境溫度 (°C)</label>
+                <input type="number" id="temperature" value="25" min="-50" max="100" step="0.1"
+                       class="input-gauge w-full p-4 text-xl focus:outline-none focus:border-industrial-accent transition duration-150"
+                       placeholder="0.0">
+            </div>
+
+            <!-- 相對濕度輸入 -->
+            <div class="relative">
+                <label for="humidity" class="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Rel. Humidity / 相對濕度 (%)</label>
+                <input type="number" id="humidity" value="60" min="0" max="100" step="1"
+                       class="input-gauge w-full p-4 text-xl focus:outline-none focus:border-industrial-accent transition duration-150"
+                       placeholder="0">
+            </div>
+
+            <!-- 計算按鈕 -->
+            <button onclick="calculateDewPoint()"
+                    class="btn-press w-full bg-industrial-accent hover:bg-orange-500 text-black font-black py-4 uppercase tracking-widest transition duration-200 focus:outline-none">
+                Execute Calculation / 執行計算
+            </button>
+        </div>
+
+        <!-- 結果顯示區域 -->
+        <div id="result-container" class="mt-10">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xs font-black uppercase tracking-widest text-gray-400">Analysis Output / 分析輸出</h2>
+                <span class="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
+            </div>
+            
+            <div id="result-output" class="lcd-display p-6 text-center">
+                <div class="text-xs font-mono text-blue-400 mb-1">DEW_POINT_VAL</div>
+                <p class="text-5xl font-bold text-industrial-accent font-mono">-- °C</p>
+            </div>
+            
+            <!-- 錯誤/提示訊息 -->
+            <div id="message" class="mt-4 p-3 border border-red-900 bg-red-950/30 text-xs text-red-400 font-mono hidden">
+                [SYSTEM_ERR]: 
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-8 pt-4 border-t border-gray-800 flex justify-between items-end opacity-40">
+                <div class="text-[10px] font-mono">
+                    MODEL: Magnus-Tetens<br>
+                    VER: 2.0.4-INDUSTRIAL
+                </div>
+                <div class="text-right text-[10px] font-mono">
+                    Created by Randy Chen
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 阻擋滑鼠右鍵選單 ---
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        }, false);
+
+        function calculateDewPoint() {
+            const tempInput = document.getElementById('temperature');
+            const humidityInput = document.getElementById('humidity');
+            const resultValue = document.querySelector('#result-output .text-5xl');
+            const messageElement = document.getElementById('message');
+
+            messageElement.classList.add('hidden');
+            resultValue.textContent = '...';
+            
+            const T = parseFloat(tempInput.value);
+            const RH = parseFloat(humidityInput.value);
+
+            if (isNaN(T) || T < -50 || T > 100) {
+                showError('INVALID_TEMP_RANGE [-50, 100]');
+                resultValue.textContent = 'ERR';
+                return;
+            }
+
+            if (isNaN(RH) || RH < 0 || RH > 100) {
+                showError('INVALID_RH_RANGE [0, 100]');
+                resultValue.textContent = 'ERR';
+                return;
+            }
+
+            const b = 17.62;
+            const c = 243.12;
+            
+            try {
+                const gamma = Math.log(RH / 100) + (b * T) / (c + T);
+                const Td = (c * gamma) / (b - gamma);
+                
+                // 模擬讀取感
+                setTimeout(() => {
+                    resultValue.textContent = `${Td.toFixed(1)}°C`;
+                    
+                    if (Td >= T - 1) {
+                        showError(`WARN: 露點(${Td.toFixed(1)}°C) 接近環境溫度，凝結風險極高。`);
+                    }
+                }, 100);
+
+            } catch (error) {
+                showError('CALC_LOGIC_ERROR');
+                resultValue.textContent = 'NaN';
+            }
+        }
+
+        function showError(msg) {
+            const messageElement = document.getElementById('message');
+            messageElement.textContent = `[SYSTEM_LOG]: ${msg}`;
+            messageElement.classList.remove('hidden');
+        }
+
+        window.onload = function() {
+            calculateDewPoint();
+        };
+    </script>
+</body>
+</html>
